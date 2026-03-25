@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create an Axios instance pointing to the backend API
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  baseURL: import.meta.env.VITE_API_URL,
   headers: {
     'Content-Type': 'application/json'
   },
@@ -12,7 +12,7 @@ const apiClient = axios.create({
 // Request interceptor to attach JWT token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('locrab_jwt_token');
+    const token = localStorage.getItem('lumiemi_jwt_token');
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }

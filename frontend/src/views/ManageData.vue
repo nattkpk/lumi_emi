@@ -20,7 +20,7 @@ import {
 const activeTab = ref('emissions') // 'emissions' or 'countries'
 
 // Auth State
-const isLoggedIn = ref(!!localStorage.getItem('locrab_jwt_token'))
+const isLoggedIn = ref(!!localStorage.getItem('lumiemi_jwt_token'))
 const loginForm = ref({ username: '', password: '' })
 const loginError = ref('')
 const isLoggingIn = ref(false)
@@ -99,7 +99,7 @@ const handleLogin = async () => {
   isLoggingIn.value = true
   try {
     const res = await apiClient.post('/auth/login', loginForm.value)
-    localStorage.setItem('locrab_jwt_token', res.token)
+    localStorage.setItem('lumiemi_jwt_token', res.token)
     isLoggedIn.value = true
     showLoginModal.value = false
     refreshData()
@@ -143,7 +143,7 @@ const downloadCSV = () => {
 }
 
 const handleLogout = () => {
-  localStorage.removeItem('locrab_jwt_token')
+  localStorage.removeItem('lumiemi_jwt_token')
   isLoggedIn.value = false
   countries.value = []
   emissions.value = []
