@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Country {
+  id        Int        @id @default(autoincrement())
+  iso_code  String     @unique @db.VarChar(10)
+  name      String     @db.VarChar(255)
+  emissions Emission[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([iso_code])
+  @@index([name])
+}
+
+model Emission {
+  id        Int      @id @default(autoincrement())
+  countryId Int
+  year      Int
+  gas_type  String   @db.VarChar(50)
+  sector    String?  @db.VarChar(100)
+  value     Float?
+  unit      String   @default("MtCO2e") @db.VarChar(50)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  country   Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  @@unique([countryId, year, gas_type, sector])
+  @@index([countryId])
+  @@index([year])
+  @@index([gas_type])
+  @@index([sector])
+  @@index([countryId, year])
+}
