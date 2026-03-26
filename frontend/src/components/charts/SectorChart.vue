@@ -1,6 +1,20 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from "vue";
-import * as echarts from "echarts";
+// Tree-shaking ECharts
+import * as echarts from "echarts/core";
+import { BarChart } from "echarts/charts";
+import {
+  TooltipComponent,
+  GridComponent,
+} from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
+
+echarts.use([
+  BarChart,
+  TooltipComponent,
+  GridComponent,
+  CanvasRenderer,
+]);
 import apiClient from "../../api/client";
 
 const props = defineProps({

@@ -4,12 +4,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import './style.css'
 import App from './App.vue'
-import Dashboard from './views/Dashboard.vue'
-import ManageData from './views/ManageData.vue'
-
 const routes = [
-  { path: '/', component: Dashboard },
-  { path: '/manage', component: ManageData }
+  { path: '/', component: () => import('./views/Dashboard.vue') },
+  { path: '/manage', component: () => import('./views/ManageData.vue') }
 ]
 
 const router = createRouter({
