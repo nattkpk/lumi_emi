@@ -5,6 +5,66 @@ const prisma = new PrismaClient();
 const { useCache, clearCache } = require('../middleware/cacheMiddleware');
 const authMiddleware = require('../middleware/authMiddleware');
 
+/**
+ * @swagger
+ * tags:
+ *   name: Emissions
+ *   description: Greenhouse gas emissions data endpoints
+ */
+
+/**
+ * @swagger
+ * /api/emissions/trend:
+ *   get:
+ *     summary: Get emissions trend for a country
+ *     tags: [Emissions]
+ *     description: Returns yearly emissions data (total sector) for a given country, grouped by year with each gas type as a property. Cached for 5 minutes.
+ *     parameters:
+ *       - in: query
+ *         name: country
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ISO 3166-1 alpha-3 country code
+ *         example: THA
+ *     responses:
+ *       200:
+ *         description: Array of yearly trend data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   year:
+ *                     type: integer
+ *                     example: 2020
+ *                   co2:
+ *                     type: number
+ *                     example: 254.31
+ *                   ch4:
+ *                     type: number
+ *                     example: 102.45
+ *                   n2o:
+ *                     type: number
+ *                     example: 23.67
+ *                   total_ghg:
+ *                     type: number
+ *                     example: 380.43
+ *       400:
+ *         description: Missing country parameter
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Country not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get('/trend', useCache, async (req, res, next) => {
   try {
     const { country } = req.query;
@@ -30,6 +90,55 @@ router.get('/trend', useCache, async (req, res, next) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/emissions/map:
+ *   get:
+ *     summary: Get world map emissions data
+ *     tags: [Emissions]
+ *     description: Returns emissions values per country for a given year and gas type. Used to render the choropleth world map. Cached for 5 minutes.
+ *     parameters:
+ *       - in: query
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Year to query
+ *         example: 2020
+ *       - in: query
+ *         name: gas
+ *         required: false
+ *         schema:
+ *           type: string
+ *           default: total_ghg
+ *           enum: [total_ghg, co2, ch4, n2o]
+ *         description: Gas type filter (defaults to total_ghg)
+ *     responses:
+ *       200:
+ *         description: Array of country emission values
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   iso_code:
+ *                     type: string
+ *                     example: THA
+ *                   name:
+ *                     type: string
+ *                     example: Thailand
+ *                   value:
+ *                     type: number
+ *                     example: 380.43
+ *       400:
+ *         description: Missing or invalid year parameter
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get('/map', useCache, async (req, res, next) => {
   try {
     const { year, gas } = req.query;
@@ -55,6 +164,71 @@ router.get('/map', useCache, async (req, res, next) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/emissions/sector:
+ *   get:
+ *     summary: Get sector breakdown for a country
+ *     tags: [Emissions]
+ *     description: |
+ *       Returns emission values broken down by sector for a given country, year, and gas type.
+ *       - If `gas=total_ghg`, returns a breakdown by gas type (co2, ch4, n2o) instead of sectors.
+ *       - For other gas types, returns sector-level data (agriculture, energy, etc.).
+ *     parameters:
+ *       - in: query
+ *         name: country
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ISO 3166-1 alpha-3 country code
+ *         example: THA
+ *       - in: query
+ *         name: year
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Year to query
+ *         example: 2020
+ *       - in: query
+ *         name: gas
+ *         required: false
+ *         schema:
+ *           type: string
+ *           default: co2
+ *           enum: [total_ghg, co2, ch4, n2o]
+ *         description: Gas type filter (defaults to co2)
+ *     responses:
+ *       200:
+ *         description: Array of sector/gas breakdown values
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   sector:
+ *                     type: string
+ *                     example: agriculture
+ *                   value:
+ *                     type: number
+ *                     example: 45.23
+ *                   unit:
+ *                     type: string
+ *                     example: MtCO2e
+ *       400:
+ *         description: Missing required parameters or invalid year
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Country not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get('/sector', useCache, async (req, res, next) => {
   try {
     const { country, year, gas } = req.query;
@@ -105,6 +279,67 @@ router.get('/sector', useCache, async (req, res, next) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/emissions/filter:
+ *   get:
+ *     summary: Filter emissions data
+ *     tags: [Emissions]
+ *     description: Flexible query endpoint to filter emissions by gas type, country (or multiple countries), and year. Results are sorted by year descending. Cached for 5 minutes.
+ *     parameters:
+ *       - in: query
+ *         name: gas
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [total_ghg, co2, ch4, n2o]
+ *         description: Gas type to filter by
+ *         example: co2
+ *       - in: query
+ *         name: country
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: "Comma-separated ISO codes, or 'all' for all countries"
+ *         example: THA,USA,CHN
+ *       - in: query
+ *         name: year
+ *         required: false
+ *         schema:
+ *           type: integer
+ *         description: Filter by specific year
+ *         example: 2020
+ *     responses:
+ *       200:
+ *         description: Filtered list of emission records with country info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 allOf:
+ *                   - $ref: '#/components/schemas/Emission'
+ *                   - type: object
+ *                     properties:
+ *                       iso_code:
+ *                         type: string
+ *                         example: THA
+ *                       country_name:
+ *                         type: string
+ *                         example: Thailand
+ *       400:
+ *         description: Missing gas parameter or invalid year
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: No valid countries found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get('/filter', useCache, async (req, res, next) => {
   try {
     const { country, gas, year } = req.query;
@@ -142,6 +377,70 @@ router.get('/filter', useCache, async (req, res, next) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/emissions:
+ *   post:
+ *     summary: Create a new emission record
+ *     tags: [Emissions]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - iso_code
+ *               - year
+ *               - gas_type
+ *               - sector
+ *             properties:
+ *               iso_code:
+ *                 type: string
+ *                 example: THA
+ *                 description: ISO country code (must exist in countries table)
+ *               year:
+ *                 type: integer
+ *                 example: 2023
+ *               gas_type:
+ *                 type: string
+ *                 example: co2
+ *               sector:
+ *                 type: string
+ *                 example: energy
+ *               value:
+ *                 type: number
+ *                 example: 150.5
+ *               unit:
+ *                 type: string
+ *                 example: MtCO2e
+ *                 default: MtCO2e
+ *     responses:
+ *       201:
+ *         description: Emission record created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Emission'
+ *       400:
+ *         description: Missing required fields
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Unauthorized — JWT token required
+ *       404:
+ *         description: Country not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       409:
+ *         description: Duplicate record (unique constraint violation)
+ */
 router.post('/', authMiddleware, async (req, res, next) => {
   try {
     const { iso_code, year, gas_type, sector, value, unit } = req.body;
@@ -170,6 +469,50 @@ router.post('/', authMiddleware, async (req, res, next) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/emissions/{id}:
+ *   put:
+ *     summary: Update an emission record
+ *     tags: [Emissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Emission record ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               value:
+ *                 type: number
+ *                 example: 275.8
+ *               unit:
+ *                 type: string
+ *                 example: MtCO2e
+ *     responses:
+ *       200:
+ *         description: Emission record updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Emission'
+ *       401:
+ *         description: Unauthorized — JWT token required
+ *       404:
+ *         description: Emission not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.put('/:id', authMiddleware, async (req, res, next) => {
   try {
     const { value, unit } = req.body;
@@ -189,6 +532,33 @@ router.put('/:id', authMiddleware, async (req, res, next) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/emissions/{id}:
+ *   delete:
+ *     summary: Delete an emission record
+ *     tags: [Emissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Emission record ID
+ *     responses:
+ *       204:
+ *         description: Emission record deleted
+ *       401:
+ *         description: Unauthorized — JWT token required
+ *       404:
+ *         description: Emission not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.delete('/:id', authMiddleware, async (req, res, next) => {
   try {
     await prisma.emission.delete({

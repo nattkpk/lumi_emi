@@ -10,8 +10,7 @@ import HeroGlobe from "../components/ui/HeroGlobe.vue";
 import SkeletonLoader from "../components/ui/SkeletonLoader.vue";
 import BaseButton from "../components/ui/BaseButton.vue";
 import { ArrowDownTrayIcon } from "@heroicons/vue/24/outline";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
+// html2canvas and jspdf are loaded dynamically to optimize bundle size
 
 const countries = ref([]);
 const selectedCountry = ref("THA");
@@ -54,6 +53,13 @@ const downloadComponent = async (elementRef, name) => {
   if (!elementRef) return;
   isExporting.value = true;
   try {
+    // Dynamically import libraries to optimize bundle size and resolve build errors
+    const [html2canvasModule, { jsPDF }] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf"),
+    ]);
+    const html2canvas = html2canvasModule.default;
+
     const canvas = await html2canvas(elementRef, {
       scale: 2,
       useCORS: true,
