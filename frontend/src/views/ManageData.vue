@@ -345,7 +345,7 @@ const filteredEmissions = computed(() => {
           <BaseButton
             variant="ghost"
             @click="handleLogout"
-            class="text-brand-primary hover:bg-red-10 dark:text-white dark:hover:bg-red-900/20"
+            class="text-text-main hover:bg-red-10  dark:hover:bg-red-900/20"
             >Logout</BaseButton
           >
           <BaseButton @click="openAddModal" class="shadow-md">
@@ -417,7 +417,7 @@ const filteredEmissions = computed(() => {
           <div
             v-for="iso in selectedISOs"
             :key="iso"
-            class="flex items-center space-x-1 bg-white border border-border-subtle px-3 py-1.5 rounded-full shadow-sm animate-in zoom-in duration-200 dark:bg-bg-main dark:border-border-subtle dark:hover:border-brand-primary"
+            class="flex items-center space-x-1 bg-white border border-border-subtle px-3 py-1.5 rounded-full dark:bg-bg-main dark:border-border-subtle dark:hover:border-brand-primary"
           >
             <span class="text-sm font-bold ">{{ iso }}</span>
             <button
@@ -566,20 +566,20 @@ const filteredEmissions = computed(() => {
                 :key="c.id"
                 class="hover:bg-bg-secondary/50 transition-colors"
               >
-                <td class="px-6 py-4 text-sm font-semibold text-brand-primary dark:text-white">
+                <td class="px-6 py-4 text-sm font-semibold text-text-main">
                   {{ c.iso_code }}
                 </td>
                 <td class="px-6 py-4 text-sm text-text-main">{{ c.name }}</td>
                 <td v-if="isLoggedIn" class="px-6 py-4 text-right space-x-2">
                   <button
                     @click="openEditModal(c)"
-                    class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  class="p-2 text-text-main hover:bg-brand-primary/50 rounded-lg transition-colors flex-shrink-0"
                   >
                     <PencilSquareIcon class="w-5 h-5" />
                   </button>
                   <button
                     @click="deleteItem(c.id)"
-                    class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <TrashIcon class="w-5 h-5" />
                   </button>
@@ -592,7 +592,7 @@ const filteredEmissions = computed(() => {
                 :key="e.id"
                 class="hover:bg-bg-secondary/50 transition-colors"
               >
-                <td class="px-6 py-4 text-sm font-bold text-brand-primary dark:text-white">
+                <td class="px-6 py-4 text-sm font-bold text-text-main">
                   <div class="flex flex-col">
                     <span>{{ e.iso_code }}</span>
                     <span class="text-[10px] text-text-muted font-normal">{{
@@ -623,7 +623,7 @@ const filteredEmissions = computed(() => {
                 <td v-if="isLoggedIn" class="px-6 py-4 text-right space-x-2">
                   <button
                     @click="openEditModal(e)"
-                    class="p-2 text-white hover:bg-brand-primary rounded-lg transition-colors flex-shrink-0"
+                    class="p-2 text-text-main hover:bg-brand-primary/50 rounded-lg transition-colors flex-shrink-0"
                   >
                     <PencilSquareIcon class="w-5 h-5" />
                   </button>
