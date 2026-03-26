@@ -29,11 +29,23 @@ const chartRef = ref(null);
 let chartInstance = null;
 const loading = ref(false);
 const errorMsg = ref("");
+const isDark = ref(document.documentElement.classList.contains("dark"));
+
+let observer = null;
 
 const initChart = () => {
   if (chartRef.value && !chartInstance) {
     chartInstance = echarts.init(chartRef.value);
     window.addEventListener("resize", handleResize);
+
+    // Watch for dark mode changes
+    observer = new MutationObserver(() => {
+      isDark.value = document.documentElement.classList.contains("dark");
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
   }
 };
 
@@ -66,10 +78,11 @@ const fetchData = async () => {
     const years = mainData.map((d) => d.year);
     const series = [];
     const legend = [];
+    const primaryColor = isDark.value ? "#ffffff" : "#15372c";
 
     if (!props.compareWith) {
       const gases = [
-        { key: "co2", name: "CO₂", color: "#15372c" },
+        { key: "co2", name: "CO₂", color: primaryColor },
         { key: "ch4", name: "CH₄", color: "#10b981" },
         { key: "n2o", name: "N₂O", color: "#0ea5e9" },
         { key: "total_ghg", name: "Total GHG", color: "#94a3b8", dashed: true },
@@ -99,7 +112,7 @@ const fetchData = async () => {
         type: "line",
         smooth: true,
         symbol: "none",
-        lineStyle: { width: 3, color: "#15372c" },
+        lineStyle: { width: 3, color: primaryColor },
         data: mainValues,
       });
       legend.push(props.country);
@@ -124,12 +137,12 @@ const fetchData = async () => {
     const option = {
       tooltip: {
         trigger: "axis",
-        backgroundColor: "rgba(255, 255, 255, 0.9)",
-        borderColor: "#e5e7eb",
-        textStyle: { color: "#15372c" },
+        backgroundColor: isDark.value ? "rgba(33, 33, 36, 0.9)" : "rgba(255, 255, 255, 0.9)",
+        borderColor: isDark.value ? "#3f3f46" : "#e5e7eb",
+        textStyle: { color: isDark.value ? "#ffffff" : "#15372c" },
         axisPointer: { type: "cross" },
       },
-      legend: { data: legend, bottom: 0, textStyle: { fontSize: 10 } },
+      legend: { data: legend, bottom: 0, textStyle: { fontSize: 10, color: isDark.value ? "#a1a1aa" : "#6b7280" } },
       grid: { left: "3%", right: "4%", bottom: "15%", containLabel: true },
       xAxis: {
         type: "value",
@@ -139,16 +152,16 @@ const fetchData = async () => {
         maxInterval: 5,
         splitNumber: 15,
         axisLabel: {
-          color: "#6b7280",
+          color: isDark.value ? "#a1a1aa" : "#6b7280",
           formatter: "{value}",
           rotate: years.length > 10 ? 45 : 0,
         },
         splitLine: {
           show: true,
-          lineStyle: { type: "dashed", color: "#f3f4f6" },
+          lineStyle: { type: "dashed", color: isDark.value ? "#27272a" : "#f3f4f6" },
         },
       },
-      yAxis: { type: "value", name: "MtCO₂e", axisLabel: { color: "#6b7280" } },
+      yAxis: { type: "value", name: "MtCO₂e", axisLabel: { color: isDark.value ? "#a1a1aa" : "#6b7280" }, nameTextStyle: { color: isDark.value ? "#a1a1aa" : "#6b7280" } },
       series,
     };
 
@@ -161,7 +174,7 @@ const fetchData = async () => {
 };
 
 watch(
-  [() => props.country, () => props.compareWith, () => props.gas],
+  [() => props.country, () => props.compareWith, () => props.gas, isDark],
   fetchData,
 );
 
@@ -172,6 +185,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
+  if (observer) observer.disconnect();
   if (chartInstance) chartInstance.dispose();
 });
 </script>

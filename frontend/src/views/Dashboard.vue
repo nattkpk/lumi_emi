@@ -169,7 +169,7 @@ onUnmounted(() => {
       <div
         class="flex flex-col md:flex-row gap-8 items-end border-b border-border-subtle pb-8"
       >
-        <div class="w-full md:w-1/4">
+        <div class="w-full md:w-1/4 flex flex-col space-y-2">
           <BaseSelect
             v-model="selectedCountry"
             label="Region/Country"
@@ -245,6 +245,20 @@ onUnmounted(() => {
                   >{{ selectedGas.replace("_", " ") }}</span
                 >
               </div>
+              
+              <div class="flex items-center space-x-2" v-if="!loading">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted">Compare Mode</span>
+                <button 
+                  @click="isCompareMode = !isCompareMode"
+                  class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+                  :class="isCompareMode ? 'bg-brand-primary' : 'bg-gray-300'"
+                >
+                  <span 
+                    class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                    :class="isCompareMode ? 'translate-x-4' : 'translate-x-0'"
+                  />
+                </button>
+              </div>
             </div>
           </template>
           <div class="h-[400px]">
@@ -280,7 +294,7 @@ onUnmounted(() => {
                   </svg>
                   <span>Select Year</span>
                 </label>
-                <span class="text-brand-primary font-bold text-lg">{{
+                <span class="text-brand-secondary font-bold text-lg">{{
                   selectedYear
                 }}</span>
               </div>
@@ -317,6 +331,7 @@ onUnmounted(() => {
             <SectorChart
               v-else
               :country="selectedCountry"
+              :compareWith="isCompareMode ? secondCountry : null"
               :year="selectedYear"
               :gas="selectedGas"
             />
@@ -329,7 +344,13 @@ onUnmounted(() => {
           </template>
           <div class="h-[350px]">
             <SkeletonLoader v-if="loading" height="100%" />
-            <EmissionsMap v-else :year="selectedYear" :gas="selectedGas" />
+            <EmissionsMap
+              v-else
+              :country="selectedCountry"
+              :compareWith="isCompareMode ? secondCountry : null"
+              :year="selectedYear"
+              :gas="selectedGas"
+            />
           </div>
         </BaseCard>
       </div>

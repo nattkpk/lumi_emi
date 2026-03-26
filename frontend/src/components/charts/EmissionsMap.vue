@@ -18,9 +18,14 @@ echarts.use([
 import apiClient from "../../api/client";
 
 const props = defineProps({
+  country: { type: String, default: null },
+  compareWith: { type: String, default: null },
   year: { type: [Number, String], required: true },
   gas: { type: String, default: "total_ghg" },
 });
+
+const isDark = ref(document.documentElement.classList.contains("dark"));
+let observer = null;
 
 const chartRef = ref(null);
 let chartInstance = null;
@@ -32,6 +37,14 @@ const initChart = async () => {
   if (chartRef.value && !chartInstance) {
     chartInstance = echarts.init(chartRef.value);
     window.addEventListener("resize", handleResize);
+
+    observer = new MutationObserver(() => {
+      isDark.value = document.documentElement.classList.contains("dark");
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
   }
 
   if (!mapRegistered) {
@@ -81,9 +94,9 @@ const fetchData = async () => {
     const option = {
       tooltip: {
         trigger: "item",
-        backgroundColor: "#ffffff",
-        borderColor: "#e5e7eb",
-        textStyle: { color: "#15372c" },
+        backgroundColor: isDark.value ? "rgba(33, 33, 36, 0.9)" : "#ffffff",
+        borderColor: isDark.value ? "#3f3f46" : "#e5e7eb",
+        textStyle: { color: isDark.value ? "#ffffff" : "#15372c" },
         formatter: (params) => {
           if (!params.value && params.value !== 0)
             return `<strong>${params.name}</strong><br/>No Data`;
@@ -99,8 +112,12 @@ const fetchData = async () => {
         text: ["High", "Low"],
         realtime: false,
         calculable: true,
-        inRange: { color: ["#ecfdf5", "#34d399", "#10b981", "#15372c"] },
-        textStyle: { color: "#6b7280" },
+        inRange: { 
+          color: isDark.value 
+            ? ["#1e293b", "#334155", "#10b981", "#ffffff"] 
+            : ["#ecfdf5", "#34d399", "#10b981", "#15372c"] 
+        },
+        textStyle: { color: isDark.value ? "#a1a1aa" : "#6b7280" },
         left: "right",
         bottom: "bottom",
       },
@@ -110,17 +127,50 @@ const fetchData = async () => {
           type: "map",
           map: "world",
           roam: true,
-          itemStyle: { borderColor: "#ffffff", areaColor: "#f3f4f6" },
+          itemStyle: { 
+            borderColor: isDark.value ? "#334155" : "#ffffff", 
+            areaColor: isDark.value ? "#1e293b" : "#f3f4f6" 
+          },
           emphasis: {
             itemStyle: { areaColor: "#f59e0b" },
             label: { show: false },
           },
+          select: {
+            itemStyle: {
+              areaColor: "#f59e0b",
+              borderColor: "#ffffff",
+              borderWidth: 2,
+            },
+            label: { show: true, color: "#ffffff", fontWeight: "bold" }
+          },
+          selectedMode: "multiple",
           data: mapData,
         },
       ],
     };
 
-    if (chartInstance) chartInstance.setOption(option, true);
+    if (chartInstance) {
+      chartInstance.setOption(option, true);
+      
+      // Highlight selected countries
+      const selectedIndices = [];
+      if (props.country) {
+        const idx = mapData.findIndex(d => d.iso === props.country);
+        if (idx !== -1) selectedIndices.push(idx);
+      }
+      if (props.compareWith) {
+        const idx = mapData.findIndex(d => d.iso === props.compareWith);
+        if (idx !== -1) selectedIndices.push(idx);
+      }
+      
+      if (selectedIndices.length > 0) {
+        chartInstance.dispatchAction({
+          type: 'select',
+          seriesIndex: 0,
+          dataIndex: selectedIndices
+        });
+      }
+    }
   } catch {
     errorMsg.value = "Failed to load chart data.";
   } finally {
@@ -128,7 +178,7 @@ const fetchData = async () => {
   }
 };
 
-watch([() => props.year, () => props.gas], () => {
+watch([() => props.year, () => props.gas, () => props.country, () => props.compareWith, isDark], () => {
   if (mapRegistered) fetchData();
 });
 
@@ -139,6 +189,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
+  if (observer) observer.disconnect();
   if (chartInstance) chartInstance.dispose();
 });
 </script>
