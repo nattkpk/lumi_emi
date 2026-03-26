@@ -6,8 +6,8 @@ const path = require('path');
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Starting seed process...');
-  const csvFilePath = path.join(__dirname, '../data/owid-co2-data.csv');
+  console.log('Starting World Bank data seed process...');
+  const csvFilePath = path.join(__dirname, '../data/data_for_test.csv');
   
   if (!fs.existsSync(csvFilePath)) {
     console.error(`CSV file not found at ${csvFilePath}`);
@@ -18,102 +18,99 @@ async function main() {
   let emissionsBatch = [];
   let countriesMap = new Map(); // iso_code -> countryId
   
-  // First, we need to gather unique countries
-  console.log('Parsing countries...');
-  const countries = new Set();
-  const countryDict = {};
+  const seriesMap = {
+    'EN.ATM.GHGT.KT.CE': { gas: 'total_ghg', sector: 'total' },
+    'EN.ATM.CO2E.KT': { gas: 'co2', sector: 'total' },
+    'EN.ATM.METH.KT.CE': { gas: 'ch4', sector: 'total' },
+    'EN.ATM.NOXE.KT.CE': { gas: 'n2o', sector: 'total' },
+    // Sectors
+    'EN.ATM.METH.AG.KT.CE': { gas: 'ch4', sector: 'agriculture' },
+    'EN.ATM.METH.EG.KT.CE': { gas: 'ch4', sector: 'energy' },
+    'EN.ATM.NOXE.AG.KT.CE': { gas: 'n2o', sector: 'agriculture' },
+    'EN.ATM.NOXE.EG.KT.CE': { gas: 'n2o', sector: 'energy' }
+  };
 
-  return new Promise((resolve, reject) => {
+  const countries = new Set();
+  const countryNames = {};
+
+  console.log('Step 1: Parsing countries...');
+  await new Promise((resolve, reject) => {
     fs.createReadStream(csvFilePath)
       .pipe(csv())
       .on('data', (row) => {
-         // Filter out regional data (regions usually don't have iso_code in OWID, or we can just use those with iso_code)
-         if (row.iso_code && row.country) {
-            if (!countries.has(row.iso_code)) {
-              countries.add(row.iso_code);
-              countryDict[row.iso_code] = row.country;
-            }
-         }
+        const iso = row['Country Code'];
+        const name = row['Country Name'];
+        if (iso && name && iso.length === 3) {
+          if (!countries.has(iso)) {
+            countries.add(iso);
+            countryNames[iso] = name;
+          }
+        }
       })
       .on('end', async () => {
-         console.log(`Found ${countries.size} countries. Inserting into database...`);
-         
-         // Insert countries
-         for (const iso of countries) {
-           const countryRecord = await prisma.country.upsert({
-             where: { iso_code: iso },
-             update: { name: countryDict[iso] },
-             create: { iso_code: iso, name: countryDict[iso] }
-           });
-           countriesMap.set(iso, countryRecord.id);
-         }
-         
-         console.log('Parsing emissions...');
-         
-         fs.createReadStream(csvFilePath)
-           .pipe(csv())
-           .on('data', (row) => {
-              const iso = row.iso_code;
-              if (!iso || !countriesMap.has(iso)) return;
-              
-              const countryId = countriesMap.get(iso);
-              const year = parseInt(row.year);
-              if (isNaN(year)) return;
+        console.log(`Found ${countries.size} countries. Upserting...`);
+        for (const iso of countries) {
+          const countryRecord = await prisma.country.upsert({
+            where: { iso_code: iso },
+            update: { name: countryNames[iso] },
+            create: { iso_code: iso, name: countryNames[iso] }
+          });
+          countriesMap.set(iso, countryRecord.id);
+        }
+        resolve();
+      })
+      .on('error', reject);
+  });
 
-              // Parse CO2
-              if (row.co2) {
-                 emissionsBatch.push({ countryId, year, gas_type: 'co2', sector: 'total', value: parseFloat(row.co2), unit: 'MtCO2e' });
-              }
-              // Parse CH4
-              if (row.methane) {
-                 emissionsBatch.push({ countryId, year, gas_type: 'ch4', sector: 'total', value: parseFloat(row.methane), unit: 'MtCO2e' });
-              }
-              // Parse N2O
-              if (row.nitrous_oxide) {
-                 emissionsBatch.push({ countryId, year, gas_type: 'n2o', sector: 'total', value: parseFloat(row.nitrous_oxide), unit: 'MtCO2e' });
-              }
-              // Total GHG
-              if (row.total_ghg) {
-                 emissionsBatch.push({ countryId, year, gas_type: 'total_ghg', sector: 'total', value: parseFloat(row.total_ghg), unit: 'MtCO2e' });
-              }
-              
-              // Sector Data (example for CO2)
-              const sectors = [
-                { key: 'cement_co2', name: 'cement' },
-                { key: 'coal_co2', name: 'coal' },
-                { key: 'flaring_co2', name: 'flaring' },
-                { key: 'gas_co2', name: 'gas' },
-                { key: 'oil_co2', name: 'oil' },
-                { key: 'other_industry_co2', name: 'other_industry' }
-              ];
+  console.log('Step 2: Parsing emissions (Wide to Long mapping)...');
+  await new Promise((resolve, reject) => {
+    fs.createReadStream(csvFilePath)
+      .pipe(csv())
+      .on('data', (row) => {
+        const iso = row['Country Code'];
+        const seriesCode = row['Series Code'];
+        
+        if (!countriesMap.has(iso) || !seriesMap[seriesCode]) return;
+        
+        const countryId = countriesMap.get(iso);
+        const mapping = seriesMap[seriesCode];
 
-              for (const s of sectors) {
-                 if (row[s.key]) {
-                    emissionsBatch.push({ countryId, year, gas_type: 'co2', sector: s.name, value: parseFloat(row[s.key]), unit: 'MtCO2e' });
-                 }
-              }
-           })
-           .on('end', async () => {
-              console.log(`Parsed ${emissionsBatch.length} emission records. Inserting in batches...`);
-              
-              // Clear previous emissions to avoid unique constraint issues
-              await prisma.emission.deleteMany({});
-              
-              for (let i = 0; i < emissionsBatch.length; i += batchSize) {
-                const batch = emissionsBatch.slice(i, i + batchSize);
-                await prisma.emission.createMany({
-                  data: batch,
-                  skipDuplicates: true
-                });
-                if (i % 50000 === 0) {
-                  console.log(`Inserted ${i} records...`);
-                }
-              }
-              
-              console.log('Seed completed successfully!');
-              resolve();
-           })
-           .on('error', reject);
+        // Parse years 1990 to 2023
+        for (let year = 1990; year <= 2023; year++) {
+          const colName = `${year} [YR${year}]`;
+          let valStr = row[colName];
+          
+          if (valStr && valStr !== '..' && valStr !== 'NA') {
+            const val = parseFloat(valStr);
+            if (!isNaN(val)) {
+              emissionsBatch.push({
+                countryId,
+                year,
+                gas_type: mapping.gas,
+                sector: mapping.sector,
+                value: val / 1000, // Convert kt to Mt
+                unit: 'MtCO2e'
+              });
+            }
+          }
+        }
+      })
+      .on('end', async () => {
+        console.log(`Parsed ${emissionsBatch.length} records. Clearing old data and inserting...`);
+        
+        await prisma.emission.deleteMany({});
+        
+        for (let i = 0; i < emissionsBatch.length; i += batchSize) {
+          const batch = emissionsBatch.slice(i, i + batchSize);
+          await prisma.emission.createMany({
+            data: batch,
+            skipDuplicates: true
+          });
+          if (i % 5000 === 0) console.log(`Inserted ${i} records...`);
+        }
+        
+        console.log('Seed completed successfully!');
+        resolve();
       })
       .on('error', reject);
   });

@@ -5,13 +5,14 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Greenhouse Gas Emissions API',
+      title: 'Lumiemi API',
       version: '1.0.0',
       description: 'API for managing and viewing greenhouse gas emissions data.',
     },
     servers: [
       {
-        url: 'http://localhost:3001',
+        url: process.env.BASE_URL || 'http://localhost:3001',
+        description: process.env.BASE_URL ? 'Production Server' : 'Local Development Server',
       },
     ],
   },

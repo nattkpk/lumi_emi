@@ -33,6 +33,11 @@
   --color-border-subtle: #4b5563;
 }
 
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   @apply bg-bg-main text-text-main font-sans antialiased min-h-screen selection:bg-brand-primary selection:text-white tracking-wide transition-colors duration-300;
 }
@@ -58,11 +63,11 @@ h1, h2, h3, h4, h5, h6 {
   @apply transition-all font-medium rounded-btn px-6 py-2.5 flex items-center justify-center active:scale-95;
 }
 
-/* ซ่อน Scrollbar */
-.no-scrollbar::-webkit-scrollbar {
+/* Global Scrollbar Hiding */
+*::-webkit-scrollbar {
   display: none;
 }
-.no-scrollbar {
+* {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }

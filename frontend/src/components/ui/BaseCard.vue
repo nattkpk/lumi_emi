@@ -1,5 +1,4 @@
 <script setup>
-// BaseCard acts as a unified container for dashboard items
 </script>
 
 <template>

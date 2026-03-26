@@ -5,8 +5,6 @@ const prisma = new PrismaClient();
 const { useCache, clearCache } = require('../middleware/cacheMiddleware');
 const authMiddleware = require('../middleware/authMiddleware');
 
-// GET /api/emissions/trend
-// Query: country (iso_code)
 router.get('/trend', useCache, async (req, res, next) => {
   try {
     const { country } = req.query;
@@ -15,18 +13,14 @@ router.get('/trend', useCache, async (req, res, next) => {
     const countryRecord = await prisma.country.findUnique({ where: { iso_code: country } });
     if (!countryRecord) return res.status(404).json({ message: 'Country not found' });
 
-    // Fetch emissions where sector is 'total'
     const emissions = await prisma.emission.findMany({
       where: { countryId: countryRecord.id, sector: 'total' },
       orderBy: { year: 'asc' }
     });
 
-    // Group by year
     const trendData = {};
     emissions.forEach(e => {
-      if (!trendData[e.year]) {
-        trendData[e.year] = { year: e.year };
-      }
+      if (!trendData[e.year]) trendData[e.year] = { year: e.year };
       trendData[e.year][e.gas_type] = e.value;
     });
 
@@ -36,62 +30,74 @@ router.get('/trend', useCache, async (req, res, next) => {
   }
 });
 
-// GET /api/emissions/map
-// Query: year
 router.get('/map', useCache, async (req, res, next) => {
   try {
-    const { year } = req.query;
+    const { year, gas } = req.query;
     if (!year) return res.status(400).json({ message: 'year is required' });
 
     const yr = parseInt(year);
     if (isNaN(yr)) return res.status(400).json({ message: 'year must be a number' });
 
+    const gasType = gas || 'total_ghg';
+
     const emissions = await prisma.emission.findMany({
-      where: { year: yr, gas_type: 'total_ghg', sector: 'total' },
+      where: { year: yr, gas_type: gasType, sector: 'total' },
       include: { country: true }
     });
 
-    const mapData = emissions.map(e => ({
+    res.json(emissions.map(e => ({
       iso_code: e.country.iso_code,
       name: e.country.name,
-      total_ghg: e.value
-    }));
-
-    res.json(mapData);
+      value: e.value
+    })));
   } catch (err) {
     next(err);
   }
 });
 
-// GET /api/emissions/sector
-// Query: country (iso_code), year
 router.get('/sector', useCache, async (req, res, next) => {
   try {
-    const { country, year } = req.query;
+    const { country, year, gas } = req.query;
     if (!country || !year) return res.status(400).json({ message: 'country and year are required' });
 
+    const gasType = gas || 'co2';
     const yr = parseInt(year);
     if (isNaN(yr)) return res.status(400).json({ message: 'year must be a number' });
 
     const countryRecord = await prisma.country.findUnique({ where: { iso_code: country } });
     if (!countryRecord) return res.status(404).json({ message: 'Country not found' });
 
-    // Fetch emissions where sector is not 'total' and gas_type is usually co2 or total_ghg
-    // OWID mostly has sector breakdown for CO2
-    const emissions = await prisma.emission.findMany({
-      where: { 
-        countryId: countryRecord.id, 
-        year: yr,
-        sector: { not: 'total' },
-        gas_type: 'co2' 
-      }
-    });
+    let sectorData = [];
 
-    const sectorData = emissions.map(e => ({
-      sector: e.sector,
-      value: e.value,
-      unit: e.unit
-    }));
+    if (gasType === 'total_ghg') {
+      const emissions = await prisma.emission.findMany({
+        where: {
+          countryId: countryRecord.id,
+          year: yr,
+          sector: 'total',
+          gas_type: { not: 'total_ghg' }
+        }
+      });
+      sectorData = emissions.map(e => ({
+        sector: e.gas_type.replace('_', ' ').toUpperCase(),
+        value: e.value,
+        unit: e.unit
+      }));
+    } else {
+      const emissions = await prisma.emission.findMany({
+        where: {
+          countryId: countryRecord.id,
+          year: yr,
+          sector: { not: 'total' },
+          gas_type: gasType
+        }
+      });
+      sectorData = emissions.map(e => ({
+        sector: e.sector,
+        value: e.value,
+        unit: e.unit
+      }));
+    }
 
     res.json(sectorData);
   } catch (err) {
@@ -99,21 +105,22 @@ router.get('/sector', useCache, async (req, res, next) => {
   }
 });
 
-// GET /api/emissions/filter
-// Query: country, gas, year (optional)
 router.get('/filter', useCache, async (req, res, next) => {
   try {
     const { country, gas, year } = req.query;
-    if (!country || !gas) return res.status(400).json({ message: 'country and gas are required' });
+    if (!gas) return res.status(400).json({ message: 'gas is required' });
 
-    const countryRecord = await prisma.country.findUnique({ where: { iso_code: country } });
-    if (!countryRecord) return res.status(404).json({ message: 'Country not found' });
+    const query = { gas_type: gas, sector: 'total' };
 
-    const query = {
-      countryId: countryRecord.id,
-      gas_type: gas,
-      sector: 'total'
-    };
+    if (country && country !== 'all') {
+      const countriesList = country.split(',');
+      const countryRecords = await prisma.country.findMany({
+        where: { iso_code: { in: countriesList } }
+      });
+      if (!countryRecords.length) return res.status(404).json({ message: 'No valid countries found' });
+      query.countryId = { in: countryRecords.map(c => c.id) };
+    }
+
     if (year) {
       if (isNaN(parseInt(year))) return res.status(400).json({ message: 'year must be a number' });
       query.year = parseInt(year);
@@ -121,16 +128,20 @@ router.get('/filter', useCache, async (req, res, next) => {
 
     const emissions = await prisma.emission.findMany({
       where: query,
-      orderBy: { year: 'asc' }
+      orderBy: { year: 'desc' },
+      include: { country: true }
     });
 
-    res.json(emissions);
+    res.json(emissions.map(e => ({
+      ...e,
+      iso_code: e.country.iso_code,
+      country_name: e.country.name
+    })));
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/emissions
 router.post('/', authMiddleware, async (req, res, next) => {
   try {
     const { iso_code, year, gas_type, sector, value, unit } = req.body;
@@ -151,7 +162,7 @@ router.post('/', authMiddleware, async (req, res, next) => {
         unit: unit || 'MtCO2e'
       }
     });
-    
+
     clearCache();
     res.status(201).json(emission);
   } catch (err) {
@@ -159,7 +170,6 @@ router.post('/', authMiddleware, async (req, res, next) => {
   }
 });
 
-// PUT /api/emissions/:id
 router.put('/:id', authMiddleware, async (req, res, next) => {
   try {
     const { value, unit } = req.body;
@@ -179,7 +189,6 @@ router.put('/:id', authMiddleware, async (req, res, next) => {
   }
 });
 
-// DELETE /api/emissions/:id
 router.delete('/:id', authMiddleware, async (req, res, next) => {
   try {
     await prisma.emission.delete({

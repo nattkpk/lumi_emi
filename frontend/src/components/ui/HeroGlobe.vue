@@ -13,20 +13,19 @@ const loading = ref(true)
 const initChart = async () => {
   if (chartRef.value && !chartInstance) {
     chartInstance = echarts.init(chartRef.value)
-    
+
     try {
       const res = await fetch('https://cdn.jsdelivr.net/npm/echarts@4.9.0/map/json/world.json')
       const geoJson = await res.json()
       echarts.registerMap('world', geoJson)
       mapRegistered = true
-      
+
       chartInstance.on('click', (params) => {
         emit('countryClick', { name: params.name, iso: params.data?.iso })
       })
 
       fetchData()
-    } catch (err) {
-      console.error('Map loading error', err)
+    } catch {
       loading.value = false
     }
   }
@@ -34,10 +33,10 @@ const initChart = async () => {
 
 const fetchData = async () => {
   if (!mapRegistered) return
-  
+
   try {
     const data = await apiClient.get('/emissions/map?year=2022')
-    
+
     const mapData = data.map(d => ({
       name: d.name,
       value: d.total_ghg,
@@ -63,36 +62,32 @@ const fetchData = async () => {
         show: false,
         min: 0,
         max: maxVal,
-        inRange: {
-          color: ['#a7f3d0', '#34d399', '#10b981', '#047857']
-        }
+        inRange: { color: ['#a7f3d0', '#34d399', '#10b981', '#047857'] }
       },
-      series: [
-        {
-          type: 'map',
-          map: 'world',
-          roam: false, 
-          itemStyle: {
-            borderColor: 'rgba(255,255,255,0.4)',
-            borderWidth: 0.8,
-            areaColor: 'rgba(255, 255, 255, 0.08)'
-          },
-          emphasis: {
-            itemStyle: { areaColor: '#f59e0b', borderColor: '#ffffff', borderWidth: 2 },
-            label: { show: false }
-          },
-          data: mapData,
-          left: 'center',
-          top: 'center',
-          layoutCenter: ['50%', '50%'],
-          layoutSize: '130%'
-        }
-      ]
+      series: [{
+        type: 'map',
+        map: 'world',
+        roam: false,
+        itemStyle: {
+          borderColor: 'rgba(255,255,255,0.4)',
+          borderWidth: 0.8,
+          areaColor: 'rgba(255, 255, 255, 0.08)'
+        },
+        emphasis: {
+          itemStyle: { areaColor: '#f59e0b', borderColor: '#ffffff', borderWidth: 2 },
+          label: { show: false }
+        },
+        data: mapData,
+        left: 'center',
+        top: 'center',
+        layoutCenter: ['50%', '50%'],
+        layoutSize: '110%'
+      }]
     }
-    
+
     chartInstance.setOption(option)
-  } catch (err) {
-    console.error('Data fetch error', err)
+  } catch {
+    /* silent */
   } finally {
     loading.value = false
   }

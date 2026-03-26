@@ -2,6 +2,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ChartBarSquareIcon, DocumentTextIcon, SunIcon, MoonIcon } from '@heroicons/vue/24/outline'
+import BaseToast from './components/ui/BaseToast.vue'
+import { useToast } from './composables/useToast'
+
+const { toasts, removeToast } = useToast()
 
 const router = useRouter()
 const route = useRoute()
@@ -13,7 +17,6 @@ const tabs = [
 
 const currentTab = computed(() => route.path)
 
-// Dark Mode Logic
 const isDark = ref(false)
 
 const toggleDark = () => {
@@ -38,16 +41,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <div id="main-scroll" class="h-screen overflow-y-auto bg-bg-main flex flex-col font-sans text-text-main no-scrollbar">
+  <div id="main-scroll" class="min-h-screen bg-bg-main flex flex-col font-sans text-text-main">
     <header class="bg-brand-primary text-white sticky top-0 z-50">
-      <div class="max-w-7xl mx-auto h-20 flex items-center justify-between">
+      <div class="max-w-7xl mx-auto h-20 flex items-center justify-between px-4 sm:px-6 lg:px-8">
         <div class="flex items-center space-x-4">
           <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
             <span class="text-brand-primary font-bold text-lg font-heading">L</span>
           </div>
-          <h1 class="text-2xl font-bold font-heading tracking-tight">LumiEMI 
-            <!-- <span class="text-white/60 text-sm font-normal ml-2 font-sans hidden sm:inline-block">Climate Clarity</span> -->
-          </h1>
+          <h1 class="text-2xl font-bold font-heading tracking-tight">LumiEMI</h1>
         </div>
         
         <div class="flex items-center space-x-2">
@@ -84,6 +85,18 @@ onMounted(() => {
         </transition>
       </router-view>
     </main>
+
+    <div 
+      aria-live="assertive" 
+      class="fixed top-4 right-4 z-[100] pointer-events-none flex flex-col items-end space-y-4 max-w-[calc(100vw-2rem)]"
+    >
+      <BaseToast 
+        v-for="toast in toasts" 
+        :key="toast.id"
+        v-bind="toast"
+        @close="removeToast(toast.id)"
+      />
+    </div>
   </div>
 </template>
 
